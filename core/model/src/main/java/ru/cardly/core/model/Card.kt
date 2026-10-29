@@ -1,0 +1,41 @@
+package ru.cardly.core.model
+
+enum class BarcodeFormat {
+    CODE_128,
+    CODE_39,
+    CODE_93,
+    CODABAR,
+    EAN_13,
+    EAN_8,
+    ITF,
+    UPC_A,
+    UPC_E,
+    QR_CODE,
+    DATA_MATRIX,
+    PDF_417,
+    AZTEC,
+    UNKNOWN,
+}
+
+data class Card(
+    val id: String,
+    val name: String,
+    val barcodeValue: String,
+    val barcodeFormat: BarcodeFormat = BarcodeFormat.UNKNOWN,
+    val cardNumber: String = "",
+    val note: String = "",
+    val frontImagePath: String? = null,
+    val backImagePath: String? = null,
+    val showName: Boolean = true,
+    val groupId: String? = null,
+    val favorite: Boolean = false,
+    val archived: Boolean = false,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val lastUsedAt: Long? = null,
+    val useCount: Long = 0,
+    val validFrom: Long? = null,
+    val validUntil: Long? = null,
+    val sortOrder: Long = 0,
+    val revision: Long = 1,
+)

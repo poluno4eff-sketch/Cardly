@@ -1,0 +1,81 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.1.0'
+
+      - name: Read version from the project
+        run: |
+          VERSION="$(grep -o 'versionName = "[^"]*"' mobile/build.gradle.kts | head -1 | sed 's/versionName = "//; s/"$//')"
+          test -n "$VERSION"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Собираем Cardly $VERSION"
+
+      - name: Restore signing key when available
+        if: github.event_name == 'push'
+        env:
+          CARDLY_KEYSTORE_BASE64: ${{ secrets.CARDLY_KEYSTORE_BASE64 }}
+          CARDLY_KEYSTORE_PASSWORD: ${{ secrets.CARDLY_KEYSTORE_PASSWORD }}
+          CARDLY_KEY_PASSWORD: ${{ secrets.CARDLY_KEY_PASSWORD }}
+        run: |
+          if [ -n "$CARDLY_KEYSTORE_BASE64" ] && [ -n "$CARDLY_KEYSTORE_PASSWORD" ] && [ -n "$CARDLY_KEY_PASSWORD" ]; then
+            printf '%s' "$CARDLY_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cardly-signing.jks"
+            test -s "$RUNNER_TEMP/cardly-signing.jks"
+            echo "CARDLY_KEYSTORE_FILE=$RUNNER_TEMP/cardly-signing.jks" >> "$GITHUB_ENV"
+            echo "CARDLY_KEYSTORE_PASSWORD=$CARDLY_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "CARDLY_KEY_ALIAS=cardly" >> "$GITHUB_ENV"
+            echo "CARDLY_KEY_PASSWORD=$CARDLY_KEY_PASSWORD" >> "$GITHUB_ENV"
+          else
+            echo "Signing secrets unavailable; building unsigned APKs."
+          fi
+
+      - name: Build release APKs
+        run: gradle :mobile:assembleRelease :wear:assembleRelease --stacktrace
+
+      - name: Verify release signatures when signing is configured
+        if: env.CARDLY_KEYSTORE_FILE != ''
+        run: |
+          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          "$APKSIGNER" verify --print-certs mobile/build/outputs/apk/release/mobile-release.apk > "$RUNNER_TEMP/phone-cert.txt"
+          "$APKSIGNER" verify --print-certs wear/build/outputs/apk/release/wear-release.apk > "$RUNNER_TEMP/watch-cert.txt"
+          grep 'Signer #1 certificate SHA-256 digest:' "$RUNNER_TEMP/phone-cert.txt" > "$RUNNER_TEMP/phone-digest.txt"
+          grep 'Signer #1 certificate SHA-256 digest:' "$RUNNER_TEMP/watch-cert.txt" > "$RUNNER_TEMP/watch-digest.txt"
+          cmp "$RUNNER_TEMP/phone-digest.txt" "$RUNNER_TEMP/watch-digest.txt"
+          grep -Fx 'Signer #1 certificate SHA-256 digest: 5ee0f71edff7ee922c2a504c67a2f8756dcf046a850432f87d2f4cd0918bd4c5' "$RUNNER_TEMP/phone-digest.txt"
+
+      - name: Verify fixed card list and branding
+        run: |
+          ! grep -R "items(count = Int.MAX_VALUE" mobile/src wear/src
+          grep -q 'android:label="Cardly"' wear/src/main/AndroidManifest.xml
+          # Тестовая сборка ставится рядом с боевой и называется «Cardly тест»,
+          # поэтому метку проверяем только у боевого applicationId.
+          if grep -q 'applicationId = "ru.cardly.app"' mobile/build.gradle.kts; then
+            grep -q 'android:label="Cardly"' mobile/src/main/AndroidManifest.xml
+          fi
+          grep -Rq 'enableReaderMode' mobile/src/main/java
+          grep -q 'showName' core/model/src/main/java/ru/cardly/core/model/Card.kt
+          grep -q 'autoCloseSeconds' wear/src/main/java/ru/cardly/wear/MainActivity.kt

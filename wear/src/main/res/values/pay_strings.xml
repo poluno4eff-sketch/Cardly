@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pay_accessibility_description">Открывать экран оплаты Cardly вместо Google Wallet (кнопка оплаты на часах). Оплата проходит через Mir Pay.</string>
+    <string name="pay_complication_label">Оплата Cardly</string>
+</resources>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-feature android:name="android.hardware.type.watch" android:required="true" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="Cardly"
+        android:theme="@android:style/Theme.Material.NoActionBar">
+        <!-- Экран оплаты работает и без телефона; скидочные карты приходят с телефона. -->
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="true" />
+        <meta-data
+            android:name="ru.cardly.LICENSE"
+            android:value="GPL-3.0, Cardly by Alex (poluno4eff)" />
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <service
+            android:name=".CardSyncListenerService"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:path="/cardly/cards/catalog" />
+                <data android:scheme="wear" android:host="*" android:path="/cardly/pay/card" />
+            </intent-filter>
+        </service>
+        <!-- Кнопка оплаты на часах: вместо Google Wallet открывается экран оплаты Cardly (включается в «Спец. возможностях»). -->
+        <service
+            android:name=".PayAccessibilityService"
+            android:exported="true"
+            android:label="Cardly — оплата"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/pay_accessibility_config" />
+        </service>
+        <!-- Компликация «Оплата» для циферблата. -->
+        <service
+            android:name=".PayComplicationService"
+            android:exported="true"
+            android:icon="@drawable/ic_pay_wallet"
+            android:label="@string/pay_complication_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="ICON" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
+        </service>
+    </application>
+</manifest>
